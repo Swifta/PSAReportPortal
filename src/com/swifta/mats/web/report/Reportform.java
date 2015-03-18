@@ -321,8 +321,9 @@ public class Reportform extends VerticalLayout {
 
 			@Override
 			public void valueChange(ValueChangeEvent event) {
-				dat.setComponentError(null);
 				dat2.setComponentError(null);
+				dat.setComponentError(null);
+
 				Date d = null;
 				dat2.setValue(d);
 
