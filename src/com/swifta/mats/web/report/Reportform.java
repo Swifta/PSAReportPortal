@@ -113,6 +113,9 @@ public class Reportform extends VerticalLayout {
 	private DecimalFormatSymbols dfs;
 	private HorizontalLayout cByTID;
 	private boolean isTIDChanged = false;
+	private boolean isTransactionReport = false;
+	private Filter fByID;
+	private boolean isFilterByID = false;
 
 	private TextField tFTID;
 
@@ -304,6 +307,23 @@ public class Reportform extends VerticalLayout {
 					return;
 				}
 
+				if (isFilterByID) {
+
+					isFilterByID = false;
+					if (ds == null)
+						return;
+					ds.removeContainerFilter(fByID);
+					if (isFirstCriteriaChanged) {
+						refine();
+						isFirstCriteriaChanged = false;
+						return;
+					}
+					int t = ds.size();
+					modifyDataSource(t);
+					return;
+
+				}
+
 				if (dat2.getValue() == null) {
 					dat2.setValue(Calendar.getInstance().getTime());
 					return;
@@ -378,8 +398,16 @@ public class Reportform extends VerticalLayout {
 				if (reportType.getValue().toString()
 						.equals("Transaction Report"))
 					cByTID.setVisible(true);
+
 				else
 					cByTID.setVisible(false);
+
+				if (table.getCaption() != null
+						&& table.getCaption().equals(
+								reportType.getValue().toString()))
+					cByAndVal.setVisible(true);
+				else
+					cByAndVal.setVisible(false);
 				isReportTypeChanged = true;
 
 			}
@@ -655,7 +683,6 @@ public class Reportform extends VerticalLayout {
 
 	}
 
-	@SuppressWarnings("unchecked")
 	private void getTByID() {
 
 		boolean incurtable = table.getCaption() != null
@@ -666,43 +693,13 @@ public class Reportform extends VerticalLayout {
 		if (incurtable) {
 
 			ds.removeAllContainerFilters();
-			Filter f = new Equal("Transaction ID", tFTID.getValue());
-			ds.addContainerFilter(f);
+			fByID = new Equal("Transaction ID", tFTID.getValue());
+			ds.addContainerFilter(fByID);
 			int t = ds.size();
 			if (t > 0) {
-				table.setContainerDataSource(ds);
-				table.setPageLength(t);
+				isFilterByID = true;
+				modifyDataSource(t);
 
-				Iterator<Collection<?>> itr = (Iterator<Collection<?>>) table
-						.getItemIds().iterator();
-				int i = 0;
-
-				bdAmt = new BigDecimal(0.00);
-				while (itr.hasNext()) {
-					i++;
-					Object itemid = itr.next();
-					Item item = table.getItem(itemid);
-					Property<String> p = item.getItemProperty("S/N");
-					p.setValue(i + "");
-
-					try {
-						Double nd = Double.valueOf(item
-								.getItemProperty("Amount (\u20A6)").getValue()
-								.toString());
-						bdAmt = BigDecimal.valueOf(bdAmt.doubleValue() + nd);
-					} catch (Exception en) {
-
-					}
-
-				}
-
-				lbSizeTop.setValue("Total of: " + t + " result(s).");
-				lbSizeBottom.setValue("Total of: " + t + " result(s).");
-
-				lbAmountTop.setValue("Total Amount: "
-						+ nf.format(bdAmt.doubleValue()));
-				lbAmountBottom.setValue("Total Amount: "
-						+ nf.format(bdAmt.doubleValue()));
 			} else {
 				loadTByID();
 
@@ -715,14 +712,13 @@ public class Reportform extends VerticalLayout {
 		table.setCaption((ds.size() == 0) ? "No such transaction with ID: "
 				+ tFTID.getValue() : "Transaction of ID: " + tFTID.getValue());
 		tFTID.setValue("");
-		Date d = null;
-		dat2.setValue(d);
 
 	}
 
 	@SuppressWarnings("unchecked")
 	private void loadTByID() {
-
+		isTransactionReport = true;
+		isReportTypeChanged = true;
 		IndexedContainer container2 = new IndexedContainer();
 		container2.addContainerProperty("S/N", String.class, "");
 		container2.addContainerProperty("Transaction ID", String.class, "");
@@ -1031,6 +1027,8 @@ public class Reportform extends VerticalLayout {
 	@SuppressWarnings("unchecked")
 	private void loadData(Object ft, Object dat, Object dat2) {
 
+		isTransactionReport = false;
+
 		if (searchform != null)
 			searchform.removeAllComponents();
 		if (ft == null)
@@ -1064,6 +1062,8 @@ public class Reportform extends VerticalLayout {
 			container.addContainerProperty("Agent ID", String.class, "");
 			container.addContainerProperty("Dealer ID", String.class, "");
 			container.addContainerProperty("Full Name", String.class, "");
+			container.addContainerProperty("Province", String.class, "");
+			container.addContainerProperty("City", String.class, "");
 			container.addContainerProperty("Amount (\u20A6)", String.class, "");
 
 			bdAmt = new BigDecimal(0.00);
@@ -1093,18 +1093,38 @@ public class Reportform extends VerticalLayout {
 
 				StringBuilder agentsql = new StringBuilder();
 
-				agentsql.append(" select cast(tbl1.datecreated as DATE) as datecreated, ctrs.operatorid as aid, ach.username as did, concat(achd.firstname,' ',achd.lastname) as fullname, ");
-				agentsql.append(" tbl1.cashbalance as amount from accountholders ach, accountholderdetails achd, ( select actxns.userresourceid as cashacctid, sum(actxns.closingbalance) -  ");
-				agentsql.append(" sum(actxns.openingbalance) as cashbalance, actxns.datecreated as datecreated, acts.profileid as profileid, actxns.transactionid as transactionid from  ");
-				agentsql.append(" accounttransactions actxns, transactions trx,accounts acts where actxns.transactionid = trx.transactionid and trx.transactionstatusid = 1 and  ");
-				agentsql.append(" trx.transactiontypeid=1 and  actxns.accountresourceid = acts.accountid and acts.profileid = 12 group by CAST(actxns.datecreated as DATE),  ");
-				agentsql.append(" actxns.userresourceid) tbl1 join cashtransactions ctrs on ctrs.transactionid = tbl1.transactionid where ach.profileid = 11 and tbl1.cashacctid =  ");
+				agentsql.append(" select cast(tbl1.datecreated as DATE) as datecreated, ctrs.operatorid as aid, ach.username as did, concat(achd.firstname,' ',achd.lastname) as fullname,  ");
+				agentsql.append(" tbl1.cashbalance as amount, addy.province as province, addy.postalCode as postalcode, addy.city as city from accountholders ach, accountholderdetails achd,address addy, ( select actxns.userresourceid as cashacctid, sum(actxns.closingbalance) - ");
+				agentsql.append(" sum(actxns.openingbalance) as cashbalance, actxns.datecreated as datecreated, acts.profileid as profileid, actxns.transactionid as transactionid from ");
+				agentsql.append(" accounttransactions actxns, transactions trx,accounts acts where actxns.transactionid = trx.transactionid and trx.transactionstatusid = 1 and ");
+				agentsql.append(" trx.transactiontypeid=1 and  actxns.accountresourceid = acts.accountid and acts.profileid = 12 group by CAST(actxns.datecreated as DATE),");
+				agentsql.append(" actxns.userresourceid) tbl1 join cashtransactions ctrs on ctrs.transactionid = tbl1.transactionid where ach.profileid = 11 and addy.addressid = achd.addressid and tbl1.cashacctid = ");
 				agentsql.append(" ach.accountholderid and achd.accountdetailsid = ach.accountholderdetailid and datecreated >= '"
 						+ d1
 						+ "' and datecreated <= DATE_ADD('"
 						+ d2
-						+ "', INTERVAL 1 DAY)  ");
-				agentsql.append(" order by datecreated desc;  ");
+						+ "', INTERVAL 1 DAY) ");
+				agentsql.append(" order by datecreated desc; ");
+
+				/*
+				 * agentsql.append(
+				 * " select cast(tbl1.datecreated as DATE) as datecreated, ctrs.operatorid as aid, ach.username as did, concat(achd.firstname,' ',achd.lastname) as fullname, "
+				 * ); agentsql.append(
+				 * " tbl1.cashbalance as amount from accountholders ach, accountholderdetails achd, ( select actxns.userresourceid as cashacctid, sum(actxns.closingbalance) -  "
+				 * ); agentsql.append(
+				 * " sum(actxns.openingbalance) as cashbalance, actxns.datecreated as datecreated, acts.profileid as profileid, actxns.transactionid as transactionid from  "
+				 * ); agentsql.append(
+				 * " accounttransactions actxns, transactions trx,accounts acts where actxns.transactionid = trx.transactionid and trx.transactionstatusid = 1 and  "
+				 * ); agentsql.append(
+				 * " trx.transactiontypeid=1 and  actxns.accountresourceid = acts.accountid and acts.profileid = 12 group by CAST(actxns.datecreated as DATE),  "
+				 * ); agentsql.append(
+				 * " actxns.userresourceid) tbl1 join cashtransactions ctrs on ctrs.transactionid = tbl1.transactionid where ach.profileid = 11 and tbl1.cashacctid =  "
+				 * ); agentsql.append(
+				 * " ach.accountholderid and achd.accountdetailsid = ach.accountholderdetailid and datecreated >= '"
+				 * + d1 + "' and datecreated <= DATE_ADD('" + d2 +
+				 * "', INTERVAL 1 DAY)  ");
+				 * agentsql.append(" order by datecreated desc;  ");
+				 */
 
 				rs = stmt.executeQuery(agentsql.toString());
 
@@ -1123,6 +1143,10 @@ public class Reportform extends VerticalLayout {
 							.getItemProperty("Dealer ID");
 					Property<String> tdPropertyagentid = trItem
 							.getItemProperty("Agent ID");
+					Property<String> tdPropertyagentprovince = trItem
+							.getItemProperty("Province");
+					Property<String> tdPropertycity = trItem
+							.getItemProperty("City");
 					Property<String> tdPropertyevalueamount = trItem
 							.getItemProperty("Amount (\u20A6)");
 
@@ -1135,6 +1159,8 @@ public class Reportform extends VerticalLayout {
 					String did = rs.getString("did");
 					String amt = rs.getString("amount");
 					String fullname = rs.getString("fullname");
+					String province = rs.getString("province");
+					String city = rs.getString("city");
 
 					Date date = rs.getDate("datecreated");
 					String d = sdf.format(date);
@@ -1147,12 +1173,20 @@ public class Reportform extends VerticalLayout {
 						ht.get("Dealer ID").add(did);
 					}
 
-					if (!ht.containsKey("Agent ID")) {
+					if (!ht.containsKey("Province")) {
 						TreeSet<String> arrL = new TreeSet<>();
-						arrL.add(aid);
-						ht.put("Agent ID", arrL);
+						arrL.add(province);
+						ht.put("Province", arrL);
 					} else {
-						ht.get("Agent ID").add(aid);
+						ht.get("Province").add(province);
+					}
+
+					if (!ht.containsKey("City")) {
+						TreeSet<String> arrL = new TreeSet<>();
+						arrL.add(city);
+						ht.put("City", arrL);
+					} else {
+						ht.get("City").add(city);
 					}
 					try {
 						Double dn = Double.valueOf(amt);
@@ -1167,6 +1201,8 @@ public class Reportform extends VerticalLayout {
 					tdPropertyevalueamount.setValue(amt);
 					tdPropertydate.setValue(d);
 					tdPropertyfullname.setValue(fullname);
+					tdPropertyagentprovince.setValue(province);
+					tdPropertycity.setValue(city);
 
 				}
 
@@ -1190,6 +1226,8 @@ public class Reportform extends VerticalLayout {
 			}
 
 		} else if (selectedId.equalsIgnoreCase("Transaction Report")) {
+
+			isTransactionReport = true;
 
 			IndexedContainer container2 = new IndexedContainer();
 			container2.addContainerProperty("S/N", String.class, "");
@@ -1935,10 +1973,7 @@ public class Reportform extends VerticalLayout {
 
 	@SuppressWarnings("unchecked")
 	private void showDetailsPop(Item row) {
-		if (table.getCaption() == null)
-			return;
-
-		if (!table.getCaption().equals("Transaction Report"))
+		if (!isTransactionReport)
 			return;
 
 		table.setSelectable(false);
@@ -2149,5 +2184,41 @@ public class Reportform extends VerticalLayout {
 				Notification.Type.WARNING_MESSAGE);
 		e.printStackTrace();
 
+	}
+
+	@SuppressWarnings("unchecked")
+	private void modifyDataSource(int t) {
+		table.setContainerDataSource(ds);
+		table.setPageLength(t);
+
+		Iterator<Collection<?>> itr = (Iterator<Collection<?>>) table
+				.getItemIds().iterator();
+		int i = 0;
+
+		bdAmt = new BigDecimal(0.00);
+		while (itr.hasNext()) {
+			i++;
+			Object itemid = itr.next();
+			Item item = table.getItem(itemid);
+			Property<String> p = item.getItemProperty("S/N");
+			p.setValue(i + "");
+
+			try {
+				Double nd = Double.valueOf(item
+						.getItemProperty("Amount (\u20A6)").getValue()
+						.toString());
+				bdAmt = BigDecimal.valueOf(bdAmt.doubleValue() + nd);
+			} catch (Exception en) {
+
+			}
+
+		}
+
+		lbSizeTop.setValue("Total of: " + t + " result(s).");
+		lbSizeBottom.setValue("Total of: " + t + " result(s).");
+
+		lbAmountTop.setValue("Total Amount: " + nf.format(bdAmt.doubleValue()));
+		lbAmountBottom.setValue("Total Amount: "
+				+ nf.format(bdAmt.doubleValue()));
 	}
 }
