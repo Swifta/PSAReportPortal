@@ -1,7 +1,5 @@
 package com.swifta.mats.web.utils;
 
-import java.util.logging.Logger;
-
 import org.apache.axiom.om.OMAbstractFactory;
 import org.apache.axiom.om.OMElement;
 import org.apache.axiom.om.OMFactory;
@@ -17,8 +15,6 @@ import com.swifta.mats.web.MatsWebPortalUI;
 
 public class LoginService {
 	// private ProvisioningStub provisioningStub;
-	private static final Logger logger = Logger.getLogger(LoginService.class
-			.getName());
 
 	// static String esbendpoint =
 	// "http://127.0.0.1:8280/services/Provisionservice";

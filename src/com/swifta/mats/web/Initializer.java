@@ -1,6 +1,5 @@
 package com.swifta.mats.web;
 
-import com.vaadin.navigator.View;
 import com.vaadin.ui.TabSheet;
 import com.vaadin.ui.TabSheet.SelectedTabChangeEvent;
 import com.vaadin.ui.UI;
@@ -9,7 +8,6 @@ import com.vaadin.ui.VerticalLayout;
 public class Initializer {
 
 	private TabSheet m;
-	private View crp, cum, ct, cap, cs;
 
 	TabSheet getTS() {
 		createTabSheet();
